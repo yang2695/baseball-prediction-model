@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: baseball-model-pipeline
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
