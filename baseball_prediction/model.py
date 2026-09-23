@@ -64,7 +64,8 @@ def train_and_evaluate(features: pd.DataFrame) -> tuple[Any, dict, pd.DataFrame]
     validation = features.loc[features["season"].eq(2021)].copy()
     test = features.loc[features["season"].eq(2022)].copy()
     if any(part.empty for part in (train, validation, test)):
-        raise ValueError("Need 2015–2020 training, 2021 validation, and 2022 test games")
+        counts = features["season"].value_counts().sort_index().to_dict()
+        raise ValueError(f"Need 2015–2020 training, 2021 validation, and 2022 test games; available: {counts}")
     if train["home_win"].nunique() < 2:
         raise ValueError("Training data must contain both winners and losers")
 
