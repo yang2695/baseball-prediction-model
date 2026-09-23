@@ -2,24 +2,25 @@
 
 [![Test and train baseball model](https://github.com/yang2695/baseball-prediction-model/actions/workflows/pipeline.yml/badge.svg)](https://github.com/yang2695/baseball-prediction-model/actions/workflows/pipeline.yml)
 
-Predict **the home team's pregame probability of winning an MLB game** using historical regular-season results. This is an end-to-end Python baseball analytics portfolio project, not a betting service or a live 2026 forecast.
+Predict the **home team's chance of winning an MLB game before first pitch**. This is an end-to-end Python baseball analytics project, with reproducible historical evaluation. It is not a betting system or a live 2026 forecast.
 
-## Data and question
+## Data and target
 
-[FiveThirtyEight's historical MLB Elo file](https://github.com/fivethirtyeight/data/tree/master/mlb-elo), fetched through the [DataHub CSV mirror](https://datahub.io/fivethirtyeight/mlb-elo) because the original download endpoint is no longer reliable, provides game dates, teams, final scores, and **pregame** Elo forecasts. Its public sports forecasts were discontinued in 2023, so this project deliberately uses completed seasons **2015–2022** rather than treating the feed as live. The CSV is downloaded on demand, cached under `data/raw/`, and not committed; attribute the original dataset separately from this repo's MIT-licensed code.
+The pipeline fetches completed **2015–2025 regular-season games** from the public [MLB Stats API schedule endpoint](https://statsapi.mlb.com/api/v1/schedule?sportId=1&season=2025&gameType=R). It normalizes game IDs, dates, MLB team IDs, scores, and a neutral-site indicator when supplied. It rejects an unexpectedly short historical season instead of silently scoring a partial year (2020 has a lower cutoff because the season was shortened). The downloaded records are cached in `data/raw/mlb_games.csv` and not committed.
 
-**Target:** Did team1 (the home team, except that the venue may be neutral) win the game? Postseason games, unfinished games, and ties are excluded.
+**Target:** Whether the listed home team won. Unfinished games and ties are excluded. Each distinct MLB `gamePk` is used at most once.
 
-**Predictors, calculated as of each game's date:**
-- Home and away teams' previous 10 games: win rate, runs scored/allowed, run differential
-- Season-to-date win rates, run differential per game, and games played
-- Days of rest for each team; neutral-site indicator; month of year
+The features are calculated strictly from each team's **earlier dates** in that season:
 
-All teams start each season with neutral priors (50% win rate and 4.5 runs scored/allowed); only games on **earlier dates** are used. Because game times are not provided, no result from a doubleheader can inform another game on the same date. Crucially, **final score, postgame Elo, and FiveThirtyEight's pregame Elo probabilities are not model features**; Elo is only an external comparison.
+- Win percentage, runs scored and allowed, and run differential over the previous 10 games
+- Season-to-date win percentage, run differential per game, and games played
+- Days of rest, month, and a neutral-site flag
 
-## Reproduce the experiment
+Season-opening priors are deliberately simple (50% win rate; 4.5 runs scored/allowed). Because the schedule does not guarantee usable first-pitch ordering for every historical game, **all games on one date get their pre-date snapshots**; a doubleheader result is never a feature for another game on that date.
 
-Python 3.11 or newer recommended. From the repository root:
+## Reproduce
+
+Python 3.11 or newer recommended, from the repository root:
 
 ```bash
 python -m venv .venv
@@ -29,37 +30,37 @@ python -m pytest -q
 python -m baseball_prediction.cli
 ```
 
-To reuse a different CSV location or force a download:
+Force a fresh download with `python -m baseball_prediction.cli --refresh`. Use `--data` to pick a different cache filename and `--output-dir` for a different output directory.
 
-```bash
-python -m baseball_prediction.cli --data data/raw/mlb_elo.csv --refresh
-```
+The run creates `artifacts/model.joblib` (fitted estimator), `artifacts/evaluation.json` (metrics and sample counts), `artifacts/test_predictions.csv` (each held-out prediction), and `artifacts/calibration.png`. Never load `.joblib` files from untrusted sources.
 
-The runner produces four files in `artifacts/`: `model.joblib` (selected fitted estimator), `evaluation.json` (scores and sample counts), `test_predictions.csv` (one row per held-out game), and `calibration.png`. Generated files are intentionally ignored by Git. Do not load `.joblib` files from untrusted sources.
+**No local setup required:** the [GitHub Actions workflow](https://github.com/yang2695/baseball-prediction-model/actions/workflows/pipeline.yml) installs dependencies, runs all tests, downloads the source, and trains the model on GitHub-hosted runners. It prints scores in the Actions log and uploads `baseball-model-results` (including the model and chart) as a workflow artifact.
 
-**Prefer running everything on GitHub?** The [Actions workflow](https://github.com/yang2695/baseball-prediction-model/actions/workflows/pipeline.yml) installs dependencies, executes unit tests, downloads historical data, trains the models, and uploads `baseball-model-results` as a downloadable workflow artifact. It also prints the actual test scores in the run log.
-
-## Evaluation design
+## A fair time-based backtest
 
 | Stage | Seasons | Purpose |
 | --- | --- | --- |
-| Initial training | 2015–2020 | Learn from past results |
-| Validation | 2021 | Select logistic regression vs. histogram gradient boosting by **log loss** |
-| Final refit | 2015–2021 | Refit selected algorithm, with 2022 still unseen |
-| Final test | 2022 | Report one held-out comparison |
+| Initial training | 2015–2023 | Fit candidate models |
+| Validation | 2024 | Select logistic regression or histogram gradient boosting by **log loss** |
+| Final refit | 2015–2024 | Refit only the selected algorithm |
+| Unseen test | 2025 | Report final performance once, with no test-set tuning |
 
-We report log loss (primary), Brier score, accuracy, and ROC AUC. Lower log loss/Brier means better probability forecasts. The two benchmarks are (1) the historical home-win frequency from **training years only** and (2) FiveThirtyEight's original **pregame** Elo probability from the same test games. The gradient booster is deliberately modest in complexity; model choice is made on 2021, **not** on 2022.
+Metrics are **log loss** (primary), Brier score, accuracy, and ROC AUC. Lower log loss/Brier are better: confidently wrong predictions are penalized. A fixed train-only home-win-rate benchmark and an **independently computed pregame Elo benchmark** are scored on the *same games*. Elo uses starting rating 1500, K = 20 and a 35-point home adjustment, resetting by season; its settings are **not tuned** to the 2025 test. Elo is **not a model feature** and is not a published FiveThirtyEight forecast.
 
-The model has real limitations: no announced starting pitchers, injuries, lineup changes, travel geography, or live data; all same-date games use pre-date history; season-opening priors are simple and not optimized. A random train/test shuffle would produce an unrealistically easy evaluation, so the split is chronological.
+No current-game final score, postseason result, or 2025 target enters model training, imputation, scaling, or selection. 2025 games earlier in a season can be used to predict later 2025 games, just as an actual pregame forecaster would; no later game can influence an earlier one.
 
-## Repository map
+## Limitations
 
-- `baseball_prediction/data.py`: retrieve and validate the original game file
-- `baseball_prediction/features.py`: make leak-resistant pregame team histories
-- `baseball_prediction/model.py`: compare estimators, choose and evaluate
-- `baseball_prediction/report.py`: reliability plot
-- `baseball_prediction/cli.py`: one-command experiment
-- `tests/`: data cleaning, doubleheader leakage, new-season resets, and temporal split tests
-- `.github/workflows/pipeline.yml`: GitHub-hosted test and training run
+This prototype does **not** account for announced starting pitchers, lineups, injuries, weather, travel, or individual player talent. It resets form and Elo each season and uses simple early-season priors. A neutral-site flag depends on what the API supplies. Testing on the much more recent 2025 season makes the result more relevant than older archived forecasts, but one held-out season cannot prove future performance.
 
-No model performance numbers are included in this README unless they have been observed in a completed run.
+## Code
+
+- `baseball_prediction/data.py` — pull and validate completed MLB schedule games
+- `baseball_prediction/features.py` — leakage-resistant team histories and pregame Elo
+- `baseball_prediction/model.py` — compare, select, refit, and score models
+- `baseball_prediction/report.py` — out-of-sample calibration plot
+- `baseball_prediction/cli.py` — run the complete project
+- `tests/` — data validation, same-date leakage, season resets, and temporal splits
+- `.github/workflows/pipeline.yml` — GitHub-hosted tests and training
+
+The raw data is retrieved from MLB; this repository's MIT license covers the project code, not a claim of ownership over MLB's underlying records.
