@@ -9,6 +9,7 @@ import joblib
 from baseball_prediction.data import DEFAULT_RAW_PATH, download_games, load_games
 from baseball_prediction.features import make_features
 from baseball_prediction.model import train_and_evaluate
+from baseball_prediction.report import plot_calibration
 
 
 def main() -> None:
@@ -31,6 +32,7 @@ def main() -> None:
         json.dumps(summary, indent=2, allow_nan=False) + "\n", encoding="utf-8"
     )
     predictions.to_csv(args.output_dir / "test_predictions.csv", index=False)
+    plot_calibration(predictions, args.output_dir / "calibration.png")
     print(json.dumps({
         "selected_model": summary["selected_model"],
         "game_counts": summary["game_counts"],
