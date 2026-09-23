@@ -28,6 +28,9 @@ def test_same_date_games_do_not_leak_into_one_another():
     assert result.iloc[2]["home_recent_win_pct"] == 0.5
     assert result.iloc[2]["home_recent_runs_scored"] == 5.0
     assert result.iloc[2]["home_rest_days"] == 0
+    assert result.iloc[0]["elo_prob_home"] == pytest.approx(
+        result.iloc[1]["elo_prob_home"]
+    )
     assert not {"score1", "score2", "home_win", "elo_prob_home"}.intersection(
         FEATURE_COLUMNS
     )
@@ -45,6 +48,9 @@ def test_history_resets_between_seasons_and_tracks_rest():
     assert result.iloc[1]["home_season_win_pct"] == 1.0
     assert result.iloc[2]["home_games_played"] == 0
     assert result.iloc[2]["home_season_win_pct"] == 0.5
+    assert result.iloc[2]["elo_prob_home"] == pytest.approx(
+        result.iloc[0]["elo_prob_home"]
+    )
 
 
 def test_rejects_missing_feature_input():
