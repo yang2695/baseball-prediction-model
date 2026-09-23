@@ -52,20 +52,20 @@ def score_probabilities(actual: pd.Series | np.ndarray, probabilities: np.ndarra
 
 
 def train_and_evaluate(features: pd.DataFrame) -> tuple[Any, dict, pd.DataFrame]:
-    """Select on 2021, refit through 2021, and touch 2022 only for final testing.
+    """Select on 2024, refit through 2024, and touch 2025 only for final testing.
 
     Test labels never enter feature generation, imputation, scaling, model fitting,
-    or model selection. FiveThirtyEight's Elo is a comparison only, not a feature.
+    or model selection. The independently computed Elo is a comparison only, not a feature.
     """
     if missing := set(FEATURE_COLUMNS + ["season", "home_win", "elo_prob_home",
                                            "date", "home_team", "away_team"]).difference(features):
         raise ValueError(f"Missing modeling columns: {sorted(missing)}")
-    train = features.loc[features["season"].between(2015, 2020)].copy()
-    validation = features.loc[features["season"].eq(2021)].copy()
-    test = features.loc[features["season"].eq(2022)].copy()
+    train = features.loc[features["season"].between(2015, 2023)].copy()
+    validation = features.loc[features["season"].eq(2024)].copy()
+    test = features.loc[features["season"].eq(2025)].copy()
     if any(part.empty for part in (train, validation, test)):
         counts = features["season"].value_counts().sort_index().to_dict()
-        raise ValueError(f"Need 2015–2020 training, 2021 validation, and 2022 test games; available: {counts}")
+        raise ValueError(f"Need 2015–2023 training, 2024 validation, and 2025 test games; available: {counts}")
     if train["home_win"].nunique() < 2:
         raise ValueError("Training data must contain both winners and losers")
 
@@ -91,9 +91,9 @@ def train_and_evaluate(features: pd.DataFrame) -> tuple[Any, dict, pd.DataFrame]
     naive_probabilities = np.full(len(test), prior_home_win_rate)
     elo_probabilities = test["elo_prob_home"].to_numpy(dtype=float)
     summary = {
-        "selection_metric": "2021 validation log loss (lower is better)",
+        "selection_metric": "2024 validation log loss (lower is better)",
         "selected_model": selected_name,
-        "seasons": {"train": "2015–2020", "validation": 2021, "test": 2022},
+        "seasons": {"train": "2015–2023", "validation": 2024, "test": 2025},
         "game_counts": {
             "initial_training": int(len(train)),
             "validation": int(len(validation)),
@@ -107,7 +107,7 @@ def train_and_evaluate(features: pd.DataFrame) -> tuple[Any, dict, pd.DataFrame]
             "historical_home_rate": score_probabilities(
                 test["home_win"], naive_probabilities
             ),
-            "fivethirtyeight_pregame_elo": score_probabilities(
+            "simple_pregame_elo": score_probabilities(
                 test["home_win"], elo_probabilities
             ),
         },
