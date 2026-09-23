@@ -6,7 +6,7 @@ Predict **the home team's pregame probability of winning an MLB game** using his
 
 ## Data and question
 
-[FiveThirtyEight's historical MLB Elo file](https://github.com/fivethirtyeight/data/tree/master/mlb-elo) provides game dates, teams, final scores, and **pregame** Elo forecasts. Its public sports forecasts were discontinued in 2023, so this project deliberately uses completed seasons **2015–2022** rather than treating the feed as live. The CSV is downloaded on demand, cached under `data/raw/`, and not committed; attribute the original dataset separately from this repo's MIT-licensed code.
+[FiveThirtyEight's historical MLB Elo file](https://github.com/fivethirtyeight/data/tree/master/mlb-elo), fetched through the [DataHub CSV mirror](https://datahub.io/fivethirtyeight/mlb-elo) because the original download endpoint is no longer reliable, provides game dates, teams, final scores, and **pregame** Elo forecasts. Its public sports forecasts were discontinued in 2023, so this project deliberately uses completed seasons **2015–2022** rather than treating the feed as live. The CSV is downloaded on demand, cached under `data/raw/`, and not committed; attribute the original dataset separately from this repo's MIT-licensed code.
 
 **Target:** Did team1 (the home team, except that the venue may be neutral) win the game? Postseason games, unfinished games, and ties are excluded.
 
