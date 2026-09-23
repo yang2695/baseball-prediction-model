@@ -5,7 +5,9 @@ from urllib.request import Request, urlopen
 
 import pandas as pd
 
-SOURCE_URL = "https://projects.fivethirtyeight.com/mlb-api/mlb_elo.csv"
+# FiveThirtyEight's old CDN now serves HTML for some clients.
+# This is a CSV mirror of its archived historical file.
+SOURCE_URL = "https://datahub.io/fivethirtyeight/mlb-elo/_r/-/data/mlb_elo.csv"
 DEFAULT_RAW_PATH = Path("data/raw/mlb_elo.csv")
 REQUIRED_COLUMNS = {
     "date", "season", "playoff", "team1", "team2",
@@ -23,6 +25,11 @@ def download_games(destination: Path = DEFAULT_RAW_PATH, *, refresh: bool = Fals
     temporary = destination.with_suffix(destination.suffix + ".part")
     try:
         with urlopen(request, timeout=90) as response, temporary.open("wb") as output:
+            first_chunk = response.read(1024 * 1024)
+            first_line = first_chunk.lstrip(bytes.fromhex("efbbbf")).split(b"\n", 1)[0]
+            if not first_line.startswith(b"date,") or b"season" not in first_line:
+                raise ValueError("The data source did not return the expected MLB CSV header")
+            output.write(first_chunk)
             while chunk := response.read(1024 * 1024):
                 output.write(chunk)
         temporary.replace(destination)
