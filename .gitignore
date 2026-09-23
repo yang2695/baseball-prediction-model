@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Downloaded third-party game records and generated evaluation artifacts
+data/raw/
+artifacts/
+*.part
