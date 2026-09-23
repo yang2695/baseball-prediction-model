@@ -19,7 +19,7 @@ def plot_calibration(predictions: pd.DataFrame, destination: Path) -> None:
     ax.plot([0, 1], [0, 1], linestyle="--", label="Perfect calibration")
     for column, label in [
         ("predicted_home_win_probability", "Selected model"),
-        ("elo_prob_home", "FiveThirtyEight pregame Elo"),
+        ("elo_prob_home", "Independent pregame Elo"),
     ]:
         observed, predicted = calibration_curve(
             predictions["home_win"],
@@ -33,7 +33,7 @@ def plot_calibration(predictions: pd.DataFrame, destination: Path) -> None:
         ylim=(0, 1),
         xlabel="Predicted home-win probability",
         ylabel="Observed home-win rate",
-        title="Held-out 2022 MLB probability calibration",
+        title="Held-out 2025 MLB probability calibration",
     )
     ax.legend()
     fig.tight_layout()
