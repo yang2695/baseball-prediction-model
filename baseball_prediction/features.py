@@ -1,6 +1,6 @@
-"""Construct pregame features without looking at the outcome being predicted."""
+"""Build historical pregame team form and an independent Elo benchmark."""
 
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -17,6 +17,17 @@ FEATURE_COLUMNS = [
     "home_rest_days", "away_rest_days",
     "neutral_site", "month",
 ]
+
+# Fixed before evaluating any season. These settings are illustrative,
+# deliberately NOT tuned on the held-out test data.
+ELO_INITIAL = 1500.0
+ELO_K = 20.0
+ELO_HOME_ADVANTAGE = 35.0
+
+
+def elo_home_probability(home_rating: float, away_rating: float, neutral: int) -> float:
+    home_advantage = 0.0 if neutral else ELO_HOME_ADVANTAGE
+    return 1.0 / (1.0 + 10 ** ((away_rating - home_rating - home_advantage) / 400))
 
 
 @dataclass
@@ -65,14 +76,13 @@ class TeamHistory:
 
 
 def make_features(games: pd.DataFrame) -> pd.DataFrame:
-    """Build a game-level table in date order, updating teams AFTER each date.
+    """Snapshot all teams per date BEFORE applying any result from that date.
 
-    Grouping by date prevents doubleheader outcomes from becoming features for
-    another game played the same day when first-pitch times are unavailable.
-    Team histories reset every season; no current-game scores enter predictors.
+    The independent Elo benchmark also uses earlier-date information only.
+    Team history and Elo ratings reset at the start of each season.
     """
-    required = {"date", "season", "team1", "team2", "score1", "score2", "home_win",
-                "neutral", "elo_prob1"}
+    required = {"date", "season", "team1", "team2", "score1", "score2",
+                "home_win", "neutral"}
     if missing := required.difference(games.columns):
         raise ValueError(f"Missing columns for feature generation: {sorted(missing)}")
     if games.empty:
@@ -80,35 +90,53 @@ def make_features(games: pd.DataFrame) -> pd.DataFrame:
 
     ordered = games.sort_values("date", kind="stable")
     histories: dict[tuple[int, str], TeamHistory] = {}
+    ratings: dict[tuple[int, str], float] = {}
     rows = []
 
     for date, day in ordered.groupby("date", sort=False):
-        # Capture all pregame snapshots before recording ANY result from this date.
+        daily_elo_changes = defaultdict(float)
+        # No outcomes from this date have been added at this point.
         for game in day.itertuples(index=False):
-            home = histories.setdefault((int(game.season), game.team1), TeamHistory())
-            away = histories.setdefault((int(game.season), game.team2), TeamHistory())
+            home_key = (int(game.season), str(game.team1))
+            away_key = (int(game.season), str(game.team2))
+            home = histories.setdefault(home_key, TeamHistory())
+            away = histories.setdefault(away_key, TeamHistory())
             home_snapshot = home.snapshot(date)
             away_snapshot = away.snapshot(date)
             features = {f"home_{key}": value for key, value in home_snapshot.items()}
             features.update(
                 {f"away_{key}": value for key, value in away_snapshot.items()}
             )
+            home_rating = ratings.get(home_key, ELO_INITIAL)
+            away_rating = ratings.get(away_key, ELO_INITIAL)
+            probability = elo_home_probability(
+                home_rating, away_rating, int(game.neutral)
+            )
+            delta = ELO_K * (int(game.home_win) - probability)
+            daily_elo_changes[home_key] += delta
+            daily_elo_changes[away_key] -= delta
             features["neutral_site"] = int(game.neutral)
             features["month"] = int(date.month)
             features.update(
                 date=date,
                 season=int(game.season),
-                home_team=game.team1,
-                away_team=game.team2,
+                home_team=str(game.team1),
+                away_team=str(game.team2),
                 home_win=int(game.home_win),
-                elo_prob_home=float(game.elo_prob1),
+                elo_prob_home=probability,
             )
             rows.append(features)
+
         for game in day.itertuples(index=False):
-            histories[(int(game.season), game.team1)].add_result(
+            home_key = (int(game.season), str(game.team1))
+            away_key = (int(game.season), str(game.team2))
+            histories[home_key].add_result(
                 date=date, scored=int(game.score1), allowed=int(game.score2)
             )
-            histories[(int(game.season), game.team2)].add_result(
+            histories[away_key].add_result(
                 date=date, scored=int(game.score2), allowed=int(game.score1)
             )
+        for key, change in daily_elo_changes.items():
+            ratings[key] = ratings.get(key, ELO_INITIAL) + change
+
     return pd.DataFrame.from_records(rows)
