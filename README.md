@@ -49,6 +49,18 @@ Metrics are **log loss** (primary), Brier score, accuracy, and ROC AUC. Lower lo
 
 No current-game final score, postseason result, or 2025 target enters model training, imputation, scaling, or selection. 2025 games earlier in a season can be used to predict later 2025 games, just as an actual pregame forecaster would; no later game can influence an earlier one.
 
+## Verified 2025 held-out results
+
+The [completed GitHub Actions experiment](https://github.com/yang2695/baseball-prediction-model/actions/runs/35933490239) selected **gradient boosting** on 2024 validation log loss (0.6849 vs. 0.6864 for logistic regression), refit on 2015–2024, then evaluated 2,430 untouched 2025 regular-season games.
+
+| 2025 test forecast | Accuracy | Log loss ↓ | Brier ↓ | ROC AUC |
+| --- | ---: | ---: | ---: | ---: |
+| Selected gradient boosting | **54.73%** | **0.6858** | **0.2464** | 0.5464 |
+| Historical home-win frequency | 54.28% | 0.6897 | 0.2483 | 0.5000 |
+| Simple pregame Elo | 55.47% | 0.6890 | 0.2478 | 0.5545 |
+
+The model improves probability-based scores against both baselines but **does not have higher classification accuracy than the simple Elo benchmark**. This is a modest historical signal, not evidence of an edge in betting or future games. Counts and raw figures are tracked in [results/2025_backtest.json](results/2025_backtest.json); the model, game-by-game predictions, and calibration plot are available in that run's `baseball-model-results` artifact.
+
 ## Limitations
 
 This prototype does **not** account for announced starting pitchers, lineups, injuries, weather, travel, or individual player talent. It resets form and Elo each season and uses simple early-season priors. A neutral-site flag depends on what the API supplies. Testing on the much more recent 2025 season makes the result more relevant than older archived forecasts, but one held-out season cannot prove future performance.
