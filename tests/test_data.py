@@ -1,9 +1,11 @@
 """Checks for dataset filtering and schema validation."""
 
+import io
+
 import pandas as pd
 import pytest
 
-from baseball_prediction.data import load_games
+from baseball_prediction.data import download_games, load_games
 
 
 def test_load_games_keeps_only_finished_regular_season_games(tmp_path):
@@ -32,3 +34,15 @@ def test_missing_essential_column_fails_loudly(tmp_path):
     pd.DataFrame({"date": ["2022-01-01"]}).to_csv(path, index=False)
     with pytest.raises(ValueError, match="Missing expected columns"):
         load_games(path)
+
+
+def test_html_instead_of_csv_is_rejected_and_not_cached(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "baseball_prediction.data.urlopen",
+        lambda request, timeout: io.BytesIO(b"<html><body>not the game data</body></html>"),
+    )
+    destination = tmp_path / "raw.csv"
+    with pytest.raises(ValueError, match="expected MLB CSV header"):
+        download_games(destination)
+    assert not destination.exists()
+    assert not (tmp_path / "raw.csv.part").exists()
