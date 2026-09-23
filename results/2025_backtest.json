@@ -1,0 +1,47 @@
+{
+  "data_source": "MLB Stats API completed regular-season schedules, 2015–2025",
+  "benchmark_run": "https://github.com/yang2695/baseball-prediction-model/actions/runs/35933490239",
+  "selection_metric": "2024 validation log loss (lower is better)",
+  "selected_model": "gradient_boosting",
+  "game_counts": {
+    "initial_training": 20333,
+    "validation": 2429,
+    "final_training": 22762,
+    "test": 2430
+  },
+  "validation": {
+    "logistic_regression": {
+      "log_loss": 0.68638030033774,
+      "brier_score": 0.2461458079534665,
+      "accuracy": 0.5570193495265542,
+      "roc_auc": 0.5756459143598862
+    },
+    "gradient_boosting": {
+      "log_loss": 0.6848787088045926,
+      "brier_score": 0.2458783169575169,
+      "accuracy": 0.5541375051461507,
+      "roc_auc": 0.5715803794725638
+    }
+  },
+  "test": {
+    "selected_model": {
+      "log_loss": 0.6858174001353791,
+      "brier_score": 0.24638230924225643,
+      "accuracy": 0.5473251028806584,
+      "roc_auc": 0.5464177577727447
+    },
+    "historical_home_rate": {
+      "log_loss": 0.6897068596219778,
+      "brier_score": 0.2482814997064783,
+      "accuracy": 0.5427983539094651,
+      "roc_auc": 0.5
+    },
+    "simple_pregame_elo": {
+      "log_loss": 0.6889867511236658,
+      "brier_score": 0.24782870899852294,
+      "accuracy": 0.5547325102880658,
+      "roc_auc": 0.5544704584180935
+    }
+  },
+  "note": "Historical test results, not a prediction of future performance. Model selected using 2024; 2025 held out."
+}
